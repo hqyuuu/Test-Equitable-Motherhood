@@ -1,0 +1,18 @@
+{
+    "research_area": "Florida",
+    "real_world": true,
+    "max_Supply": 100000,
+    "max_demand": 100000,
+    "target_ratio": 0.3,
+    "the_2SFCA_beta": 1.0,
+    "total_timesteps_setting": 100000,
+    "max_amount_per_transfer": 100,
+    "Punishment_for_Violating_Conditions": 1000,
+    "additional_info": "data is what has been added",
+    "qp_like": false,
+    "remain_origin_supply": true,
+    "max_distance": 50000,
+    "max_steps_per_experiment": 1000,
+    "areas_need_focus": [17, 18, 31, 43],
+    "config_file_name": "config_Florida_1a_beta_1_0.json"
+}
