@@ -158,3 +158,81 @@ def calculate_accessibility_use_np(df_destinations, df_origins, od_matrix, beta=
         print(f"Function 'calculate_accessibility_use_np' took {elapsed_time:.4f} seconds to execute.")
 
     return df_origin_temp
+
+
+# Add calculate_gini
+#gini index 
+def calculate_gini(df_destinations, df_origins, od_matrix):
+    
+    start_time = time.time()
+
+    # Ensure consistent data type for 'OriginID' and 'DestinationID'
+    df_origins['OriginID'] = df_origins['OriginID'].astype('int64')
+    df_destinations['DestinationID'] = df_destinations['DestinationID'].astype('int64')
+    od_matrix['OriginID'] = od_matrix['OriginID'].astype('int64')
+    od_matrix['DestinationID'] = od_matrix['DestinationID'].astype('int64')
+
+    # Merge travel costs with supply and demand data
+    merged_df = od_matrix.merge(df_destinations[['DestinationID', 'D_Supply']], 
+                               on='DestinationID', how='left')
+    merged_df = merged_df.merge(df_origins[['OriginID', 'O_Demand']], 
+                               on='OriginID', how='left')
+    
+    # Calculate true supply with distance decay (supply / travel_cost^2)
+    # Replace TravelCost <= 0 with a small value to avoid division by zero
+    merged_df['TravelCost'] = merged_df['TravelCost'].replace(0, 1e-6)
+    merged_df['True_Supply'] = merged_df['D_Supply'] / (merged_df['TravelCost'] ** 2)
+    
+    # Group by OriginID to calculate total true supply available to each origin
+    total_true_supply_per_origin = merged_df.groupby('OriginID')['True_Supply'].sum().reset_index()
+    total_true_supply_per_origin.rename(columns={'True_Supply': 'Total_True_Supply'}, inplace=True)
+    
+    # Merge total true supply back to the main dataframe
+    merged_df = merged_df.merge(total_true_supply_per_origin, on='OriginID', how='left')
+    
+    # Allocate demand proportionally to true supply for each hospital-origin pair
+    merged_df['Allocated_Demand'] = (merged_df['O_Demand'] * merged_df['True_Supply']) / merged_df['Total_True_Supply']
+    
+    # Calculate supply-to-demand ratio for each hospital-origin pair
+    merged_df['Ratio'] = np.where(merged_df['Allocated_Demand'] > 0, 
+                                 merged_df['True_Supply'] / merged_df['Allocated_Demand'], 
+                                 0)
+    
+    # Function to calculate Gini index for a list of ratios
+    def gini_index(ratios):
+        if len(ratios) == 0 or np.all(ratios == 0):
+            return np.nan  # Return NaN for invalid cases
+        n = len(ratios)
+        mean_ratio = np.mean(ratios)
+        if mean_ratio == 0:
+            return np.nan  # Avoid division by zero
+        diffs = np.abs(np.subtract.outer(ratios, ratios))
+        gini = np.sum(diffs) / (2 * n**2 * mean_ratio)
+        return gini
+    
+    # Calculate Gini index for each origin
+    gini_per_origin = merged_df.groupby('OriginID').apply(
+        lambda x: gini_index(x['Ratio'].values)
+    ).reset_index(name='accessibility')  # Name the column 'accessibility'
+    
+    # Copy the original DataFrame and merge with Gini values
+    df_origins_temp = df_origins.copy()
+    df_origins_temp = df_origins_temp.merge(
+        gini_per_origin,
+        on='OriginID',
+        how='left'
+    )
+    
+    # Fill NaN with 0 in the 'accessibility' column
+    df_origins_temp['accessibility'] = df_origins_temp['accessibility'].fillna(0)
+    
+    # Select required columns and sort by OriginID
+    df_origins_updated = df_origins_temp[['OriginID', 'lng', 'lat', 'O_Demand', 'accessibility']].sort_values(by='OriginID').reset_index(drop=True)
+    
+    # Calculate execution time
+    end_time = time.time()
+    elapsed_time = end_time - start_time
+    print(f"Function 'calculate_gini' took {elapsed_time:.4f} seconds to execute.")
+    print(df_origins_updated)
+    
+    return df_origins_updated

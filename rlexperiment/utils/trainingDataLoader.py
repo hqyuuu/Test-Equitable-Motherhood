@@ -34,4 +34,4 @@ def load_training_data(research_area, dataset_dir="../datasets"):
 
 
 if __name__ == '__main__':
-    load_training_data('xiantao',dataset_dir='../../datasets/exported_data')
+    load_training_data('xiantao',dataset_dir='../../datasets/exported_data') 
